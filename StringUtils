@@ -1,0 +1,61 @@
+package com.example.yueyundong1.util;
+
+import java.security.MessageDigest;
+
+import android.text.TextUtils;
+import android.widget.EditText;
+
+/**
+ * 各种针对String的常用功能
+ * @author vagrant QQ:513302092
+ * @date 创建时间: 2015年4月27日
+ */
+public class StringUtils {
+	// 检查手机号码合法性
+	public static boolean isPhoneNumberLegal(String number) {
+		String telRegex = "[1][358]\\d{9}";
+		if (TextUtils.isEmpty(number))
+			return false;
+		else
+			return number.matches(telRegex);
+	}
+
+	// 密码合法性检查,正则表达式可根据具体情况修改
+	public boolean isPasswordLegal(String password) {
+		String pwRegex = "^[a-zA-Z0-9]{6,20}$";
+		return password.matches(pwRegex);
+	}
+
+	// 检查命名是否合法,正则表达式可根据具体情况修改
+	public boolean isNameLegal(String name) {
+		String nameRegex = "^[\u4E00-\u9FA5A-Za-z0-9_]{2,15}$";
+		return name.matches(nameRegex);
+	}
+
+	// 检查年龄是否合法
+	public boolean isAgeLegal(int age) {
+		if (1 <= age && age <= 99)
+			return true;
+		return false;
+	}
+	//非空判断
+	public static boolean isEmpty(CharSequence str) {
+		return (str == null || str.length() == 0);
+	}
+
+	// MD5加密
+	public static final String getMd5(final String toEncrypt) {
+		try {
+			final MessageDigest digest = MessageDigest.getInstance("md5");
+			digest.update(toEncrypt.getBytes());
+			final byte[] bytes = digest.digest();
+			final StringBuilder sb = new StringBuilder();
+			for (int i = 0; i < bytes.length; i++) {
+				sb.append(String.format("%02X", bytes[i]));
+			}
+			return sb.toString().toLowerCase();
+		} catch (Exception exc) {
+			return ""; // Impossibru!
+		}
+	}
+}
