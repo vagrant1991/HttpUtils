@@ -1,0 +1,119 @@
+package com.example.yueyundong1.util;
+
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.view.View;
+import android.widget.GridView;
+import android.widget.ImageView;
+import android.widget.ListView;
+
+import com.example.yueyundong1.R;
+import com.nostra13.universalimageloader.cache.disc.naming.Md5FileNameGenerator;
+import com.nostra13.universalimageloader.cache.memory.impl.UsingFreqLimitedMemoryCache;
+import com.nostra13.universalimageloader.core.DisplayImageOptions;
+import com.nostra13.universalimageloader.core.ImageLoader;
+import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
+import com.nostra13.universalimageloader.core.assist.ImageSize;
+import com.nostra13.universalimageloader.core.assist.QueueProcessingType;
+import com.nostra13.universalimageloader.core.listener.ImageLoadingListener;
+import com.nostra13.universalimageloader.core.listener.ImageLoadingProgressListener;
+import com.nostra13.universalimageloader.core.listener.PauseOnScrollListener;
+import com.nostra13.universalimageloader.core.listener.SimpleImageLoadingListener;
+
+/**
+ * 图片加载工具类，使用Universal image loader库加载图片
+ * 配置参考
+ * http://blog.csdn.net/vipzjyno1/article/details/23206387
+ * http://blog.csdn.net/xiaanming/article/details/26810303
+ * https://github.com/nostra13/Android-Universal-Image-Loader
+ * @author vagrant QQ:513302092
+ * @date 创建时间: 2015年4月27日
+ */
+public class UILImageLoader {
+	private static ImageLoader imageLoader;
+	private static ImageLoaderConfiguration config;
+	private static DisplayImageOptions options;
+	private static UILImageLoader instance;
+	static {
+		imageLoader = ImageLoader.getInstance();
+	}
+	
+	private UILImageLoader(Context context) {
+		//Imageloader选项配置
+		config = new ImageLoaderConfiguration.Builder(context.getApplicationContext())
+		.threadPriority(3) //线程池内加载的数量  
+		.denyCacheImageMultipleSizesInMemory()
+		.memoryCache(new UsingFreqLimitedMemoryCache(4 * 1024 * 1024)) //设置图片缓存，可传递自己的实现类
+		.memoryCacheSize(4 * 1024 * 1024) //图片缓存大小
+		.diskCacheFileNameGenerator(new Md5FileNameGenerator()) //将保存的时候的URI名称用MD5 加密  
+		.tasksProcessingOrder(QueueProcessingType.FIFO)
+		.diskCacheFileCount(50) ////缓存的文件数量  
+		.build();
+		//图片显示选择
+		options = new DisplayImageOptions.Builder()
+		.showImageOnLoading(R.drawable.ic_launcher)
+		.cacheInMemory(true)
+		.cacheOnDisk(true)
+		.showImageForEmptyUri(R.drawable.ic_launcher)
+		.showImageOnFail(R.drawable.ic_launcher)
+		.bitmapConfig(Bitmap.Config.RGB_565).build();
+		
+		imageLoader.init(config);
+	}
+	
+	public synchronized UILImageLoader getInstance(Context context) {
+		if (instance == null) 
+			return new UILImageLoader(context);
+		return instance;
+	}
+	
+	public void loadImage(String imageUrl, final ImageView imageView) {
+		imageLoader.loadImage(imageUrl, options, new SimpleImageLoadingListener() {
+			@Override
+			public void onLoadingComplete(String imageUri, View view,
+					Bitmap loadedImage) {
+				super.onLoadingComplete(imageUri, view, loadedImage);
+				imageView.setImageBitmap(loadedImage);
+			}
+		});
+	}
+	public void loadImage(String imageUrl, final ImageView imageView, int width, int height) {
+		ImageSize size = new ImageSize(width, height);
+		imageLoader.loadImage(imageUrl, size, options, new SimpleImageLoadingListener() {
+			@Override
+			public void onLoadingComplete(String imageUri, View view,
+					Bitmap loadedImage) {
+				super.onLoadingComplete(imageUri, imageView, loadedImage);
+				imageView.setImageBitmap(loadedImage);
+			}
+		});
+	}
+	
+	public void loadImage(String imageUrl, ImageLoadingListener listener) {
+		if ((imageUrl == null) || imageUrl.equals(""))
+			return;
+		imageLoader.loadImage(imageUrl, options, listener);
+	}
+	public void loadImage(String imageUrl, int width, int height, ImageLoadingListener listener) {
+		ImageSize size = new ImageSize(width, height);
+		if ((imageUrl == null) || (imageUrl.equals("")))
+			return;
+		imageLoader.loadImage(imageUrl, size, options, listener);
+	}
+	public void displayImage(String imageUrl, ImageView imageView) {
+		imageLoader.displayImage(imageUrl, imageView, options);
+	}
+		
+	public void displayImage(String imageUrl, ImageView imageView, ImageLoadingProgressListener progressListener) {
+		imageLoader.displayImage(imageUrl, imageView, options, new SimpleImageLoadingListener(), progressListener);
+	}
+	
+	public void stopLoadOnScroll(ListView listView) {
+		listView.setOnScrollListener(new PauseOnScrollListener(imageLoader, true, true));
+	}
+	
+	public void stopLoadOnScroll(GridView gridView) {
+		gridView.setOnScrollListener(new PauseOnScrollListener(imageLoader, true, true));
+	}
+	
+}
