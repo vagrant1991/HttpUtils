@@ -24,7 +24,7 @@ import com.loopj.android.http.RequestParams;
  */
 public class AsyncClientUtils {
 	
-	public static final String BASE_URL = "http://www.birdboy.cn/";
+	public static final String BASE_URL = "";
 	private static RequestParams requestParams;
 	private static AsyncHttpClient client = new AsyncHttpClient();
 	
