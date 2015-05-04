@@ -23,11 +23,14 @@ import org.xmlpull.v1.XmlPullParserFactory;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
+import android.view.View;
 import android.widget.ImageView;
 import android.widget.ImageView.ScaleType;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.android.volley.AuthFailureError;
+import com.android.volley.DefaultRetryPolicy;
 import com.android.volley.NetworkResponse;
 import com.android.volley.ParseError;
 import com.android.volley.Request;
@@ -36,6 +39,7 @@ import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.Response.ErrorListener;
 import com.android.volley.Response.Listener;
+import com.android.volley.RetryPolicy;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.HttpHeaderParser;
 import com.android.volley.toolbox.HurlStack;
@@ -103,7 +107,7 @@ public class VolleyManager {
 		if (mQueue == null) {
 			//使用默认配置,参见volley源码： https://github.com/mcxiaoke/android-volley/blob/master/src/main/java/com/android/volley/toolbox/Volley.java
 			mQueue = Volley.newRequestQueue(context.getApplicationContext());
-			// 使用OKHttp作为volley网络传输层, android 4.4 HttpUrlConnection采用了Okhttp实现，okhttp具有更好的特性
+			// 使用OKHttp作为volley网络传输层, android 4.4 HttpUrlConnection底层采用了Okhttp实现，okhttp具有更好的特性
 			//mQueue = Volley.newRequestQueue(context.getApplicationContext(), new OkHttpStack());
 		}
 		return mQueue;
@@ -127,7 +131,11 @@ public class VolleyManager {
 	public void stopRequestQueue() {
 		mQueue.stop();
 	}
-
+	//设置超时 timeout = 10000 + 10000 * 2 see:http://stackoverflow.com/questions/17094718/android-volley-timeout
+	public RetryPolicy getRetryPolicy() {
+		return new DefaultRetryPolicy(10000, 2, 2f);
+	}
+	
 	public File getCacheDir() {
 		File cacheDir = new File(context.getCacheDir(), "volley");
 		return cacheDir;
@@ -144,6 +152,7 @@ public class VolleyManager {
 	public void getWithVolley(String url, Response.Listener<String> listener) {
 		stringRequest = new StringRequest(url, listener, new MyErrorListener());
 		stringRequest.setTag(context);
+		stringRequest.setRetryPolicy(getRetryPolicy());
 		mQueue.add(stringRequest);
 	}
 
@@ -238,6 +247,7 @@ public class VolleyManager {
 			}
 		};
 		stringRequest.setTag(context);
+		stringRequest.setRetryPolicy(getRetryPolicy());
 		mQueue.add(stringRequest);
 	}
 
@@ -279,6 +289,7 @@ public class VolleyManager {
 			}
 		};
 		stringRequest.setTag(context);
+		stringRequest.setRetryPolicy(getRetryPolicy());
 		mQueue.add(stringRequest);
 	}
 
@@ -312,6 +323,7 @@ public class VolleyManager {
 		jsonObjectRequest = new JsonObjectRequest(url, null, listener,
 				new MyErrorListener());
 		jsonObjectRequest.setTag(context);
+		jsonObjectRequest.setRetryPolicy(getRetryPolicy());
 		mQueue.add(jsonObjectRequest);
 	};
 
@@ -401,6 +413,7 @@ public class VolleyManager {
 			}
 		};
 		jsonObjectRequest.setTag(context);
+		jsonObjectRequest.setRetryPolicy(getRetryPolicy());
 		mQueue.add(jsonObjectRequest);
 	}
 
@@ -460,6 +473,7 @@ public class VolleyManager {
 			}
 		};
 		jsonObjectRequest.setTag(context);
+		jsonObjectRequest.setRetryPolicy(getRetryPolicy());
 		mQueue.add(jsonObjectRequest);
 	}
 
@@ -476,6 +490,7 @@ public class VolleyManager {
 		jsonArrayRequest = new JsonArrayRequest(url, listener,
 				new MyErrorListener());
 		jsonArrayRequest.setTag(context);
+		jsonArrayRequest.setRetryPolicy(getRetryPolicy());
 		mQueue.add(jsonArrayRequest);
 	}
 
@@ -566,6 +581,7 @@ public class VolleyManager {
 			}
 		};
 		jsonArrayRequest.setTag(context);
+		jsonArrayRequest.setRetryPolicy(getRetryPolicy());		
 		mQueue.add(jsonArrayRequest);
 	}
 
@@ -637,6 +653,7 @@ public class VolleyManager {
 		imageRequest = new ImageRequest(url, listener, 0, 0, ScaleType.CENTER_INSIDE, Config.RGB_565,
 				new MyErrorListener());
 		imageRequest.setTag(context);
+		imageRequest.setRetryPolicy(getRetryPolicy());
 		mQueue.add(imageRequest);
 	}
 
@@ -656,6 +673,7 @@ public class VolleyManager {
 			}
 		}, 0, 0, ScaleType.CENTER_INSIDE, Config.RGB_565, new MyErrorListener());
 		imageRequest.setTag(context);
+		imageRequest.setRetryPolicy(getRetryPolicy());
 		mQueue.add(imageRequest);
 	}
 
@@ -758,6 +776,7 @@ public class VolleyManager {
 			int defaultImageResId, int errorImageResId) {
 		imageListener = ImageLoader.getImageListener(imageView,
 				defaultImageResId, errorImageResId);
+		imageRequest.setRetryPolicy(getRetryPolicy());
 		imageLoader.get(url, imageListener);
 	}
 
@@ -815,6 +834,7 @@ public class VolleyManager {
 			Response.Listener<XmlPullParser> listener) {
 		xmlRequest = new XMLRequest(url, listener, new MyErrorListener());
 		xmlRequest.setTag(context);
+		xmlRequest.setRetryPolicy(getRetryPolicy());
 		mQueue.add(xmlRequest);
 	}
 
@@ -834,6 +854,7 @@ public class VolleyManager {
 		GsonRequest<T> gsonRequest = new GsonRequest<T>(url, clazz, listener,
 				new MyErrorListener());
 		gsonRequest.setTag(context);
+		gsonRequest.setRetryPolicy(getRetryPolicy());
 		mQueue.add(gsonRequest);
 	}
 
@@ -939,6 +960,7 @@ public class VolleyManager {
 			}
 		};
 		gsonRequest.setTag(context);
+		gsonRequest.setRetryPolicy(getRetryPolicy());
 		mQueue.add(gsonRequest);
 	}
 
@@ -1004,7 +1026,7 @@ public class VolleyManager {
 
 	/**
 	 * note:不建议使用volley上传文件或图片，下面方法中UploadRequest引用了httpmime包实现文件上传，
-	 * 该方式需要引入httpmime包,增大文件包 可改用通过android-async-http实现文件上传 使用volley上传文件
+	 * 该方式需要引入httpmime包,增大文件包 可改用通过android-async-http实现文件上传
 	 * 
 	 * @param url
 	 *            服务器地址
@@ -1035,6 +1057,7 @@ public class VolleyManager {
 		UploadRequest uploadRequest = new UploadRequest(url, file, params,
 				listener, new MyErrorListener());
 		uploadRequest.setTag(context);
+		uploadRequest.setRetryPolicy(getRetryPolicy());
 		mQueue.add(uploadRequest);
 	}
 
