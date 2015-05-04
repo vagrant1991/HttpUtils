@@ -55,7 +55,7 @@ import com.squareup.okhttp.OkUrlFactory;
 /**
  * Volley工具类,使用Volley访问网络，封装了各种常用功能，具体查看方法注释 需添加网络连接权限：<uses-permission
  * android:name="android.permission.INTERNET" />
- * 使用GsonRequest需要引入Gson包，可替换为fastgson, 替换volley底层网络层需要引入okhttp,okhttp-urlconnection, 可maven,google最新版本
+ * 使用GsonRequest需要引入Gson包，可替换为fastjson, 替换volley底层网络层需要引入okhttp,okhttp-urlconnection, 可maven,google最新版本
  * @author vagrant QQ:513302092
  * @date 创建时间: 2015年4月4日
  */
