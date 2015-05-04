@@ -662,7 +662,10 @@ public class VolleyManager {
 		postContent = transMapToString(mapParams);
 		postWithVolley(url, postContent, clazz, listener);
 	}
-	/**
+	
+	
+	/** note:不建议使用volley上传文件或图片，可通过下面方式实现，但不推荐，该方式需要引入httpmime包,增大文件包
+	 * 可改用通过android-async-http实现文件上传
 	 * 使用volley上传文件
 	 * @param url 服务器地址
 	 * @param file 文件
