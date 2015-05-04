@@ -3,7 +3,6 @@ package com.example.yueyundong1.util;
 import java.io.File;
 import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,17 +21,18 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import com.android.volley.AuthFailureError;
 import com.android.volley.NetworkResponse;
 import com.android.volley.ParseError;
 import com.android.volley.Request;
-import com.android.volley.VolleyError;
 import com.android.volley.Request.Method;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.Response.ErrorListener;
 import com.android.volley.Response.Listener;
+import com.android.volley.VolleyError;
 import com.android.volley.toolbox.HttpHeaderParser;
 import com.android.volley.toolbox.ImageLoader;
 import com.android.volley.toolbox.ImageLoader.ImageContainer;
@@ -43,12 +43,13 @@ import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.NetworkImageView;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
+import com.google.gson.Gson;
 
 /**Volley工具类,使用Volley访问网络，封装了各种常用功能，具体查看方法注释  需添加网络连接权限：<uses-permission android:name="android.permission.INTERNET" /> 
  * @author vagrant QQ:513302092
  * @date 创建时间: 2015年4月26日
  */
-public class VolleyUtils {
+public class VolleyManager {
 	//请求队列
 	private RequestQueue mQueue;
 	//string类型请求
@@ -57,7 +58,7 @@ public class VolleyUtils {
 	private  JsonObjectRequest jsonObjectRequest;
 	//返回结果为JSONArray类型的请求
 	private  JsonArrayRequest jsonArrayRequest;
-	//定义Xml请求
+	//自定义Xml请求
 	private XMLRequest xmlRequest;
 	//返回结果为Bitmap类型的请求 
 	private  ImageRequest imageRequest;
@@ -67,19 +68,23 @@ public class VolleyUtils {
 	private ImageListener imageListener;
 	//URL完整路径
 	private  String path;
+	//Context对象,可传递activity.this，用来创建全局Request对象,管理请求的生命周期
 	private Context context;
-	private static VolleyUtils mInstance;
+	//post参数
+	private String postContent;
+	//单例
+	private static VolleyManager mInstance;
+	//默认显示网络错误提示
+	private static boolean isShowNetworkErrorToast = true;
 	
-	private VolleyUtils(Context context) {
+	private VolleyManager(Context context) {
 		this.context = context;
 		mQueue = getRequestQueue();
-		imageLoader = new ImageLoader(mQueue, new VolleyImageCache());
-		//default 
 	}
 	
-	public static synchronized VolleyUtils getInstance(Context context) {
+	public static synchronized VolleyManager getInstance(Context context) {
 		if (mInstance == null) {
-			mInstance = new VolleyUtils(context);
+			mInstance = new VolleyManager(context);
 		}
 		return mInstance;
 	}
@@ -92,36 +97,44 @@ public class VolleyUtils {
 	}
 	
 	public ImageLoader getImageLoader() {
+		if (imageLoader == null) {
+			imageLoader = new ImageLoader(mQueue, new VolleyImageCache());
+		}
 		return imageLoader;
 	}
 	
 	public <T> void addToRequestQueue(Request<T> req) {
 		getRequestQueue().add(req);
 	}
+	public void cancelRequest(Context context) {
+		mQueue.cancelAll(context);
+	}
+	public void stopRequestQueue() {
+		mQueue.stop();
+	}
+	public File getCacheDir() {
+		File cacheDir = new File(context.getCacheDir(), "volley");
+		return cacheDir;
+	}
 	/**
 	 * 使用Volley通过get方式从服务器得到响应,异步执行,不传递参数，调用相应回调接口返回结果，响应成功结果类型为String
 	 * @param url 完整服务器地址,包含参数对 如www.example.com?id=1&name=jack
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void getWithVolley(String url, Response.Listener<String> listener, Response.ErrorListener errorListener) {
-		stringRequest = new StringRequest(url, listener, errorListener);
+	public  void getWithVolley(String url, Response.Listener<String> listener) {
+		stringRequest = new StringRequest(url, listener, new MyErrorListener());
 		stringRequest.setTag(context);
 		mQueue.add(stringRequest);
 	}
-	
 	/**
 	 * 使用Volley通过get方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为String
 	 * @param api 服务器地址,不包含参数对 如www.example.com
 	 * @param postContent  id=1&id=2&id=3形式参数对
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void getWithVolley(String api, String postContent, Response.Listener<String> listener, Response.ErrorListener errorListener) {
+	public  void getWithVolley(String api, String postContent, Response.Listener<String> listener) {
 		path = attachHttpGetParam(api, postContent);
-		stringRequest = new StringRequest(path, listener, errorListener);
-		stringRequest.setTag(context);
-		mQueue.add(stringRequest);
+		getWithVolley(path, listener);
 	}
 	/**
 	 * 使用Volley通过get方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为String
@@ -129,41 +142,31 @@ public class VolleyUtils {
 	 * @param name 键
 	 * @param value 值
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void getWithVolley(String api, String name, String value, Response.Listener<String> listener, Response.ErrorListener errorListener) {
+	public  void getWithVolley(String api, String name, String value, Response.Listener<String> listener) {
 		path = attachHttpGetParam(api, name, value);
-		stringRequest = new StringRequest(path, listener, errorListener);
-		stringRequest.setTag(context);
-		mQueue.add(stringRequest);
+		getWithVolley(path, listener);
 	}
 	/**
 	 * 使用Volley通过get方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为String
 	 * @param api 服务器api地址，不包含参数对 如www.example.com
 	 * @param params List<BasicNameValuePair>形式参数
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void getWithVolley(String api, List<BasicNameValuePair> params, Response.Listener<String> listener, Response.ErrorListener errorListener) {
+	public  void getWithVolley(String api, List<BasicNameValuePair> params, Response.Listener<String> listener) {
 		path = attachHttpGetParams(api, params);
-		stringRequest = new StringRequest(path, listener, errorListener);
-		stringRequest.setTag(context);
-		mQueue.add(stringRequest);
+		getWithVolley(path, listener);
 	}
 	/**
 	 * 使用Volley通过get方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为String
 	 * @param api 服务器api地址，不包含参数对 如www.example.com
 	 * @param params Map<String, String>形式参数
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void getWithVolley(String api, Map<String, String> params, Response.Listener<String> listener, Response.ErrorListener errorListener) {
+	public  void getWithVolley(String api, Map<String, String> params, Response.Listener<String> listener) {
 		path = attacHttpGetParams(api, params);
-		stringRequest = new StringRequest(path, listener, errorListener);
-		stringRequest.setTag(context);
-		mQueue.add(stringRequest);
+		getWithVolley(path, listener);
 	}
-	
 	/**
 	 * 使用Volley通过post方式从服务器得到响应，异步执行,调用相应回调接口返回结果，响应成功结果类型为String
 	 * 参考volley github上Request类源码：https://github.com/mcxiaoke/android-volley/blob/master/src/main/java/com/android/volley/Request.java
@@ -171,10 +174,9 @@ public class VolleyUtils {
 	 * @param api 服务器api地址， 如www.example.com
 	 * @param postContent id=1&id=2&id=3形式参数对
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void postWithVolley(String api, final String postContent, Response.Listener<String> listener, Response.ErrorListener errorListener) {
-		stringRequest = new StringRequest(Method.POST, api, listener, errorListener) {
+	public  void postWithVolley(String api, final String postContent, Response.Listener<String> listener) {
+		stringRequest = new StringRequest(Method.POST, api, listener, new MyErrorListener()) {
 			@Override
 			public byte[] getPostBody() throws AuthFailureError {
 				return postContent.toString().getBytes();
@@ -189,29 +191,19 @@ public class VolleyUtils {
 	 * @param name 键
 	 * @param value 值
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void postWithVolley(String api, final String name, final String value, Response.Listener<String> listener, Response.ErrorListener errorListener) {
-		stringRequest = new StringRequest(Method.POST, api, listener, errorListener) {
-			@Override
-			protected Map<String, String> getParams() throws AuthFailureError {
-				Map<String, String> map = new HashMap<String, String>();
-				map.put(name, value);
-				return map;
-			}
-		};
-		stringRequest.setTag(context);
-		mQueue.add(stringRequest);
+	public  void postWithVolley(String api, final String name, final String value, Response.Listener<String> listener) {
+		postContent = attachKeyAndVlaue(name, value);
+		postWithVolley(api, postContent, listener);
 	}
 	/**
 	 *  使用Volley通过post方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为String
 	 * @param api 服务器地址  如www.example.com
 	 * @param params Map<String, String>形式参数
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void postWithVolley(String api, final Map<String, String> params, Response.Listener<String> listener, Response.ErrorListener errorListener) {
-		stringRequest = new StringRequest(Method.POST, api, listener, errorListener) {
+	public  void postWithVolley(String api, final Map<String, String> params, Response.Listener<String> listener) {
+		stringRequest = new StringRequest(Method.POST, api, listener, new MyErrorListener()) {
 			@Override
 			protected Map<String, String> getParams() throws AuthFailureError {
 				return params;
@@ -225,27 +217,18 @@ public class VolleyUtils {
 	 * @param api 服务器地址  如www.example.com
 	 * @param params List<BasicNameValuePair> 形式参数
 	 * @param listener 响应成功回调
-	 * @param errorListener  响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void postWithVolley(String api, final List<BasicNameValuePair> params, Response.Listener<String> listener, Response.ErrorListener errorListener) {
-		final Map<String, String> map = convertListUrlToMap(params);
-		stringRequest = new StringRequest(Method.POST,api, listener, errorListener) {
-			@Override
-			protected Map<String, String> getParams() throws AuthFailureError {
-				return map;
-			}
-		};
-		stringRequest.setTag(context);
-		mQueue.add(stringRequest);
+	public  void postWithVolley(String api, final List<BasicNameValuePair> params, Response.Listener<String> listener) {
+		Map<String, String> map = convertListUrlToMap(params);
+		postWithVolley(api, map, listener);
 	}
 	/**
 	 * 使用Volley通过get方式从服务器得到响应，不传递参数，异步执行,调用相应回调接口返回结果，响应成功结果类型为JSONObject
 	 * @param url 完整服务器地址,包含参数对 如www.example.com?id=1&name=jack
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonGetWithVolley(String url, Response.Listener<JSONObject> listener, Response.ErrorListener errorListener) {
-		jsonObjectRequest = new JsonObjectRequest(url, null, listener, errorListener);
+	public  void jsonGetWithVolley(String url, Response.Listener<JSONObject> listener) {
+		jsonObjectRequest = new JsonObjectRequest(url, null, listener, new MyErrorListener());
 		jsonObjectRequest.setTag(context);
 		mQueue.add(jsonObjectRequest);
 	};
@@ -254,13 +237,10 @@ public class VolleyUtils {
 	 * @param api 服务器地址 不包含参数对 如www.example.com
 	 * @param postContent id=1&id=2&id=3形式参数对
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonGetWithVolley(String api, String postContent, Response.Listener<JSONObject> listener, Response.ErrorListener errorListener) {
+	public  void jsonGetWithVolley(String api, String postContent, Response.Listener<JSONObject> listener) {
 		path = attachHttpGetParam(api, postContent);
-		jsonObjectRequest = new JsonObjectRequest(path, null, listener, errorListener);
-		jsonObjectRequest.setTag(context);
-		mQueue.add(jsonObjectRequest);
+		jsonGetWithVolley(path, listener);
 	}
 	/**
 	 * 使用Volley通过get方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为JSONObject
@@ -268,52 +248,41 @@ public class VolleyUtils {
 	 * @param name 键
 	 * @param value 值
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonGetWithVolley(String api, String name, String value, Response.Listener<JSONObject> listener, Response.ErrorListener errorListener) {
+	public  void jsonGetWithVolley(String api, String name, String value, Response.Listener<JSONObject> listener) {
 		path = attachHttpGetParam(api, name, value);
-		jsonObjectRequest = new JsonObjectRequest(path, null, listener, errorListener);
-		jsonObjectRequest.setTag(context);
-		mQueue.add(jsonObjectRequest);
+		jsonGetWithVolley(path, listener);
 	}
 	/**
 	 * 使用Volley通过get方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为JSONObject
 	 * @param api 服务器地址 不包含参数对 如www.example.com
 	 * @param params List<BasicNameValuePair>形式参数
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonGetWithVolley(String api, List<BasicNameValuePair> params, Response.Listener<JSONObject> listener, Response.ErrorListener errorListener) {
+	public  void jsonGetWithVolley(String api, List<BasicNameValuePair> params, Response.Listener<JSONObject> listener) {
 		path = attachHttpGetParams(api, params);
-		jsonObjectRequest = new JsonObjectRequest(path, null, listener, errorListener);
-		jsonObjectRequest.setTag(context);
-		mQueue.add(jsonObjectRequest);
+		jsonGetWithVolley(path, listener);
 	}
 	/**
 	 * 使用Volley通过get方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为JSONObject
 	 * @param api 服务器地址 不包含参数对 如www.example.com
 	 * @param params Map<String, String> 形式参数
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonGetWithVolley(String api, Map<String, String> params, Response.Listener<JSONObject> listener, Response.ErrorListener errorListener) {
+	public  void jsonGetWithVolley(String api, Map<String, String> params, Response.Listener<JSONObject> listener) {
 		path = attacHttpGetParams(api, params);
-		jsonObjectRequest = new JsonObjectRequest(path, null, listener, errorListener);
-		jsonObjectRequest.setTag(context);
-		mQueue.add(jsonObjectRequest);
+		jsonGetWithVolley(path, listener);
 	}
 	/**
 	 * 使用Volley通过post方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为JSONObject
 	 * @param api 服务器地址  如www.example.com
 	 * @param postContent id=1&id=2&id=3形式参数对
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonPostWithVolley(String api, final String postContent, Response.Listener<JSONObject> listener, Response.ErrorListener errorListener) {
-		jsonObjectRequest = new JsonObjectRequest(api, null, listener, errorListener) {
+	public  void jsonPostWithVolley(String api, final String postContent, Response.Listener<JSONObject> listener) {
+		jsonObjectRequest = new JsonObjectRequest(api, null, listener, new MyErrorListener()) {
 			@Override
 			public byte[] getPostBody() {
-				// TODO Auto-generated method stub
 				return postContent.getBytes();
 			}
 		};
@@ -326,50 +295,32 @@ public class VolleyUtils {
 	 * @param name 键
 	 * @param value 值
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonPostWithVolley(String api, String name, String value, Response.Listener<JSONObject> listener, Response.ErrorListener errorListener) {
-		final String params = attachKeyAndVlaue(name, value);
-		jsonObjectRequest = new JsonObjectRequest(api, null, listener, errorListener) {
-			@Override
-			public byte[] getPostBody() {
-				return params.getBytes();
-			}
-		};
-		jsonObjectRequest.setTag(context);
-		mQueue.add(jsonObjectRequest);
+	public  void jsonPostWithVolley(String api, String name, String value, Response.Listener<JSONObject> listener) {
+		postContent = attachKeyAndVlaue(name, value);
+		jsonPostWithVolley(api, postContent, listener);
 	}
 	/**
 	 * 使用Volley通过post方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为JSONObject
 	 * @param api 服务器地址  如www.example.com
 	 * @param listParams List<BasicNameValuePair>形式参数
 	 * @param listener  响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonPostWithVolley(String api, List<BasicNameValuePair> listParams, Response.Listener<JSONObject> listener, Response.ErrorListener errorListener) {
-		final String params = URLEncodedUtils.format(listParams, "UTF-8");
-		jsonObjectRequest = new JsonObjectRequest(api, null, listener, errorListener) {
-			@Override
-			public byte[] getPostBody() {
-				return params.getBytes();
-			}
-		};
-		jsonObjectRequest.setTag(context);
-		mQueue.add(jsonObjectRequest);
+	public  void jsonPostWithVolley(String api, List<BasicNameValuePair> listParams, Response.Listener<JSONObject> listener) {
+		postContent = URLEncodedUtils.format(listParams, "UTF-8");
+		jsonPostWithVolley(api, postContent, listener);
 	}
 	/**
 	 * 使用Volley通过post方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为JSONObject
 	 * @param api 服务器地址  如www.example.com
 	 * @param mapParams Map<String, String>形式参数
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonPostWithVolley(String api, Map<String, String> mapParams, Response.Listener<JSONObject> listener, Response.ErrorListener errorListener) {
-		final String params = transMapToString(mapParams);
-		jsonObjectRequest = new JsonObjectRequest(api, null, listener, errorListener) {
+	public  void jsonPostWithVolley(String api, final Map<String, String> mapParams, Response.Listener<JSONObject> listener) {
+		jsonObjectRequest = new JsonObjectRequest(api, null, listener, new MyErrorListener()) {
 			@Override
-			public byte[] getPostBody() {
-				return params.getBytes();
+			protected Map<String, String> getParams() throws AuthFailureError {
+				return mapParams;
 			}
 		};
 		jsonObjectRequest.setTag(context);
@@ -379,10 +330,9 @@ public class VolleyUtils {
 	 * 使用Volley通过post方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为JSONArray类型
 	 * @param url 服务器地址包含参数对  如www.example.com?id=1&id=2&id=3
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonArrayGetWithVolley(String url, Response.Listener<JSONArray> listener, Response.ErrorListener errorListener) {
-		jsonArrayRequest = new JsonArrayRequest(url, listener, errorListener);
+	public  void jsonArrayGetWithVolley(String url, Response.Listener<JSONArray> listener) {
+		jsonArrayRequest = new JsonArrayRequest(url, listener, new MyErrorListener());
 		jsonArrayRequest.setTag(context);
 		mQueue.add(jsonArrayRequest);
 	}
@@ -392,52 +342,40 @@ public class VolleyUtils {
 	 * @param name 键
 	 * @param value 值
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonArrayGetWithVolley(String url, String name, String value, Response.Listener<JSONArray> listener, Response.ErrorListener errorListener) {
+	public  void jsonArrayGetWithVolley(String url, String name, String value, Response.Listener<JSONArray> listener) {
 		path = attachHttpGetParam(url, name, value);
-		jsonArrayRequest = new JsonArrayRequest(path, listener, errorListener);
-		jsonArrayRequest.setTag(context);
-		mQueue.add(jsonArrayRequest);
+		jsonArrayGetWithVolley(path, listener);
 	}
 	/**
 	 * 使用Volley通过post方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为JSONArray类型
 	 * @param url 服务器地址 如www.example.com
 	 * @param postCotnent  id=1&id=2&id=3形式参数对
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonArrayGetWithVolley(String url, String postCotnent, Response.Listener<JSONArray> listener, Response.ErrorListener errorListener) {
+	public  void jsonArrayGetWithVolley(String url, String postCotnent, Response.Listener<JSONArray> listener) {
 		path = attachHttpGetParam(url, postCotnent);
-		jsonArrayRequest = new JsonArrayRequest(path, listener, errorListener);
-		jsonArrayRequest.setTag(context);
-		mQueue.add(jsonArrayRequest);
+		jsonArrayGetWithVolley(path, listener);
 	}
 	/**
 	 * 使用Volley通过post方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为JSONArray类型
 	 * @param url 服务器地址 如www.example.com
 	 * @param params List<BasicNameValuePair>形式参数对
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonArrayGetWithVolley(String url, List<BasicNameValuePair> params, Response.Listener<JSONArray> listener, Response.ErrorListener errorListener) {
+	public  void jsonArrayGetWithVolley(String url, List<BasicNameValuePair> params, Response.Listener<JSONArray> listener) {
 		path = attachHttpGetParams(url, params);
-		jsonArrayRequest = new JsonArrayRequest(path, listener, errorListener);
-		jsonArrayRequest.setTag(context);
-		mQueue.add(jsonArrayRequest);
+		jsonArrayGetWithVolley(path, listener);
 	}
 	/**
 	 * 使用Volley通过post方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为JSONArray类型
 	 * @param url 服务器地址 如www.example.com?id=1&id=2&id=3
 	 * @param params Map<String, String> 形式参数对
 	 * @param listener 响应成功回调 
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonArrayGetWithVolley(String url, Map<String, String> params, Response.Listener<JSONArray> listener, Response.ErrorListener errorListener) {
+	public  void jsonArrayGetWithVolley(String url, Map<String, String> params, Response.Listener<JSONArray> listener) {
 		path = attacHttpGetParams(url, params);
-		jsonArrayRequest = new JsonArrayRequest(path, listener, errorListener);
-		jsonArrayRequest.setTag(context);
-		mQueue.add(jsonArrayRequest);
+		jsonArrayGetWithVolley(path, listener);
 	}
 	
 	/**
@@ -445,10 +383,9 @@ public class VolleyUtils {
 	 * @param api 服务器地址  如www.example.com
 	 * @param postContent id=1&id=2&id=3形式参数对
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonArrayPostWithVolley(String api, final String postContent, Response.Listener<JSONArray> listener, Response.ErrorListener errorListener) {
-		jsonArrayRequest = new JsonArrayRequest(api, listener, errorListener) {
+	public  void jsonArrayPostWithVolley(String api, final String postContent, Response.Listener<JSONArray> listener) {
+		jsonArrayRequest = new JsonArrayRequest(api, listener, new MyErrorListener()) {
 			@Override
 			public byte[] getPostBody() {
 				return postContent.getBytes();
@@ -465,34 +402,19 @@ public class VolleyUtils {
 	 * @param listener 响应成功回调
 	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonArrayPostWithVolley(String api, String name, String value, Response.Listener<JSONArray> listener, Response.ErrorListener errorListener) {
-		final String params = attachKeyAndVlaue(name, value);
-		jsonArrayRequest = new JsonArrayRequest(api, listener, errorListener) {
-			@Override
-			public byte[] getPostBody() {
-				return params.getBytes();
-			}
-		};
-		jsonArrayRequest.setTag(context);
-		mQueue.add(jsonArrayRequest);
+	public  void jsonArrayPostWithVolley(String api, String name, String value, Response.Listener<JSONArray> listener) {
+		postContent = attachKeyAndVlaue(name, value);
+		jsonArrayPostWithVolley(api, postContent, listener);
 	}
 	/**
 	 * 使用Volley通过post方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为JSONArray
 	 * @param api 服务器地址  如www.example.com
 	 * @param listParams List<BasicNameValuePair>形式参数
 	 * @param listener  响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonArrayPostWithVolley(String api, List<BasicNameValuePair> listParams, Response.Listener<JSONArray> listener, Response.ErrorListener errorListener) {
-		final String params = URLEncodedUtils.format(listParams, "UTF-8");
-		jsonArrayRequest = new JsonArrayRequest(api, listener, errorListener) {
-			@Override
-			public byte[] getPostBody() {
-				return params.getBytes();
-			}
-		};
-		jsonArrayRequest.setTag(context);
-		mQueue.add(jsonArrayRequest);
+	public  void jsonArrayPostWithVolley(String api, List<BasicNameValuePair> listParams, Response.Listener<JSONArray> listener) {
+		postContent = URLEncodedUtils.format(listParams, "UTF-8");
+		jsonArrayPostWithVolley(api, postContent, listener);
 	}
 	/**
 	 * 使用Volley通过post方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为JSONArray
@@ -501,25 +423,17 @@ public class VolleyUtils {
 	 * @param listener 响应成功回调
 	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void jsonArrayPostWithVolley(String api, Map<String, String> mapParams, Response.Listener<JSONArray> listener, Response.ErrorListener errorListener) {
-		final String params = transMapToString(mapParams);
-		jsonArrayRequest = new JsonArrayRequest(api, listener, errorListener) {
-			@Override
-			public byte[] getPostBody() {
-				return params.getBytes();
-			}
-		};
-		jsonArrayRequest.setTag(context);
-		mQueue.add(jsonArrayRequest);
+	public  void jsonArrayPostWithVolley(String api, Map<String, String> mapParams, Response.Listener<JSONArray> listener) {
+		postContent = transMapToString(mapParams);
+		jsonArrayPostWithVolley(api, postContent, listener);
 	}
 	/**
 	 * 使用Volley从指定URL下载图片,返回Bitmap
 	 * @param url  图片地址
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public  void getBitmapWithVolley(String url, Response.Listener<Bitmap> listener, Response.ErrorListener errorListener) {
-		imageRequest = new ImageRequest(url, listener, 0, 0, Config.RGB_565, errorListener);
+	public  void getBitmapWithVolley(String url, Response.Listener<Bitmap> listener) {
+		imageRequest = new ImageRequest(url, listener, 0, 0, Config.RGB_565, new MyErrorListener());
 		imageRequest.setTag(context);
 		mQueue.add(imageRequest);
 	}
@@ -534,11 +448,7 @@ public class VolleyUtils {
 			public void onResponse(Bitmap arg0) {
 				imageView.setImageBitmap(arg0);
 			}
-		}, 0, 0, Config.RGB_565, new ErrorListener() {
-			@Override
-			public void onErrorResponse(VolleyError arg0) {
-			}
-		});
+		}, 0, 0, Config.RGB_565,new MyErrorListener());
 		imageRequest.setTag(context);
 		mQueue.add(imageRequest);
 	}
@@ -560,7 +470,7 @@ public class VolleyUtils {
 		imageLoader.get(url, new ImageListener() {
 			@Override
 			public void onErrorResponse(VolleyError arg0) {
-				
+				Toast.makeText(context, "网络异常， 请检查网络连接!", Toast.LENGTH_SHORT).show();
 			}
 			@Override
 			public void onResponse(ImageContainer arg0, boolean arg1) {
@@ -579,7 +489,7 @@ public class VolleyUtils {
 		imageLoader.get(url, new ImageListener() {
 			@Override
 			public void onErrorResponse(VolleyError arg0) {
-				
+				Toast.makeText(context, "网络异常， 请检查网络连接!", Toast.LENGTH_SHORT).show();
 			}
 			@Override
 			public void onResponse(ImageContainer arg0, boolean arg1) {
@@ -639,10 +549,9 @@ public class VolleyUtils {
 	 * 使用Volley通过get方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为XmlPullParser
 	 * @param url 图片地址
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public void getXmlPullParserWithVolley(String url, Response.Listener<XmlPullParser> listener, Response.ErrorListener errorListener) {
-		xmlRequest = new XMLRequest(url, listener, errorListener);
+	public void getXmlPullParserWithVolley(String url, Response.Listener<XmlPullParser> listener) {
+		xmlRequest = new XMLRequest(url, listener, new MyErrorListener());
 		xmlRequest.setTag(context);
 		mQueue.add(xmlRequest);
 	}
@@ -651,10 +560,9 @@ public class VolleyUtils {
 	 * @param url 服务器地址 如www.example.com?id=1&id=2&id=3
 	 * @param clazz 指定类的Class对象 通过如 People.class生成 或 people.getClass() 可通过clazz.newInstance得到对应类的对象
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public <T> void getPojoWithVolley(String url, Class<T> clazz, Response.Listener<T> listener, ErrorListener errorListener) {
-		GsonRequest<T> gsonRequest = new GsonRequest<T>(url, clazz, listener, errorListener);
+	public <T> void getPojoWithVolley(String url, Class<T> clazz, Response.Listener<T> listener) {
+		GsonRequest<T> gsonRequest = new GsonRequest<T>(url, clazz, listener, new MyErrorListener());
 		gsonRequest.setTag(context);
 		mQueue.add(gsonRequest);
 	}
@@ -664,13 +572,10 @@ public class VolleyUtils {
 	 * @param postConetnt  id=1&id=2&id=3形式参数
 	 * @param clazz 指定类的Class对象 通过如 People.class生成 或 people.getClass() 可通过clazz.newInstance得到对应类的对象
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public <T> void getPojoWithVolley(String url, String postConetnt, Class<T> clazz, Response.Listener<T> listener, ErrorListener errorListener) {
+	public <T> void getPojoWithVolley(String url, String postConetnt, Class<T> clazz, Response.Listener<T> listener) {
 		path = attachHttpGetParam(url, postConetnt);
-		GsonRequest<T> gsonRequest = new GsonRequest<T>(path, clazz, listener, errorListener);
-		gsonRequest.setTag(context);
-		mQueue.add(gsonRequest);
+		getPojoWithVolley(path, clazz, listener);
 	}
 	/**
 	 * 使用Volley通过get方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为T所指定类的对象
@@ -679,13 +584,10 @@ public class VolleyUtils {
 	 * @param value 值
 	 * @param clazz 指定类的Class对象 通过如 People.class生成 或 people.getClass() 可通过clazz.newInstance得到对应类的对象
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public <T> void getPojoWithVolley(String url, String name, String value, Class<T> clazz, Response.Listener<T> listener, ErrorListener errorListener) {
+	public <T> void getPojoWithVolley(String url, String name, String value, Class<T> clazz, Response.Listener<T> listener) {
 		path = attachHttpGetParam(url, name, value);
-		GsonRequest<T> gsonRequest = new  GsonRequest<T>(path, clazz, listener, errorListener);
-		gsonRequest.setTag(context);
-		mQueue.add(gsonRequest);
+		getPojoWithVolley(path, clazz, listener);
 	}
 	/**
 	 * 使用Volley通过get方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为T所指定类的对象
@@ -693,13 +595,10 @@ public class VolleyUtils {
 	 * @param params List<BasicNameValuePair形式参数
 	 * @param clazz 指定类的Class对象 通过如 People.class生成 或 people.getClass() 可通过clazz.newInstance得到对应类的对象
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */ 
-	public <T> void getPojoWithVolley(String url, List<BasicNameValuePair> params, Class<T> clazz, Response.Listener<T> listener, ErrorListener errorListener) {
+	public <T> void getPojoWithVolley(String url, List<BasicNameValuePair> params, Class<T> clazz, Response.Listener<T> listener) {
 		path = attachHttpGetParams(url, params);
-		GsonRequest<T> gsonRequest = new GsonRequest<T>(path, clazz, listener, errorListener);
-		gsonRequest.setTag(context);
-		mQueue.add(gsonRequest);
+		getPojoWithVolley(path, clazz, listener);
 	}
 	/**
 	 * 使用Volley通过get方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为T所指定类的对象
@@ -707,13 +606,10 @@ public class VolleyUtils {
 	 * @param params Map<String, String>形式参数
 	 * @param clazz 指定类的Class对象 通过如 People.class生成 或 people.getClass() 可通过clazz.newInstance得到对应类的对象
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public <T> void getPojoWithVolley(String url, Map<String, String> params, Class<T> clazz, Response.Listener<T> listener, ErrorListener errorListener) {
+	public <T> void getPojoWithVolley(String url, Map<String, String> params, Class<T> clazz, Response.Listener<T> listener) {
 		path = attacHttpGetParams(url, params);
-		GsonRequest<T> gsonRequest = new GsonRequest<T>(path, clazz, listener, errorListener);
-		gsonRequest.setTag(context);
-		mQueue.add(gsonRequest);
+		getPojoWithVolley(path, clazz, listener);
 	}
 	/**
 	 * 使用Volley通过post方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为T所指定类的对象
@@ -721,15 +617,13 @@ public class VolleyUtils {
 	 * @param postContent  id=1&id=2&id=3形式参数
 	 * @param clazz 指定类的Class对象 通过如 People.class生成 或 people.getClass() 可通过clazz.newInstance得到对应类的对象
 	 * @param listener  响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public <T> void postWithVolley(String url, final String postContent, Class<T> clazz, Response.Listener<T> listener, ErrorListener errorListener) {
-		GsonRequest<T> gsonRequest = new GsonRequest<T>(Method.POST, url, clazz, listener, errorListener) {
+	public <T> void postWithVolley(String url, final String postContent, Class<T> clazz, Response.Listener<T> listener) {
+		GsonRequest<T> gsonRequest = new GsonRequest<T>(Method.POST, url, clazz, listener, new MyErrorListener()) {
 			@Override
 			public byte[] getPostBody() throws AuthFailureError {
 				return postContent.getBytes();
 			}
-			
 		};
 		gsonRequest.setTag(context);
 		mQueue.add(gsonRequest);
@@ -741,18 +635,10 @@ public class VolleyUtils {
 	 * @param value 值 
 	 * @param clazz 指定类的Class对象 通过如 People.class生成 或 people.getClass() 可通过clazz.newInstance得到对应类的对象
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public <T> void postWithVolley(String url, String name, String value, Class<T> clazz, Response.Listener<T> listener, ErrorListener errorListener) {
-		final String params = attachHttpGetParam(name, value);
-		GsonRequest<T> gsonRequest = new GsonRequest<T>(Method.POST, url, clazz, listener, errorListener) {
-			@Override
-			public byte[] getPostBody() throws AuthFailureError {
-				return params.getBytes();
-			}
-		};
-		gsonRequest.setTag(context);
-		mQueue.add(gsonRequest);
+	public <T> void postWithVolley(String url, String name, String value, Class<T> clazz, Response.Listener<T> listener) {
+		postContent = attachHttpGetParam(name, value);
+		postWithVolley(url, postContent, clazz, listener);
 	}
 	/**
 	 * 使用Volley通过post方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为T所指定类的对象
@@ -760,18 +646,10 @@ public class VolleyUtils {
 	 * @param listParams List<BasicNameValuePair>形式参数
 	 * @param clazz 指定类的Class对象 通过如 People.class生成 或 people.getClass() 可通过clazz.newInstance得到对应类的对象
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public <T> void postWithVolley(String url, List<BasicNameValuePair> listParams, Class<T> clazz, Response.Listener<T> listener, ErrorListener errorListener) {
-		final String params = URLEncodedUtils.format(listParams, "utf-8");
-		GsonRequest<T> gsonRequest = new GsonRequest<T>(Method.POST, url, clazz, listener, errorListener) {
-			@Override
-			public byte[] getPostBody() throws AuthFailureError {
-				return params.getBytes();
-			}
-		};
-		gsonRequest.setTag(context);
-		mQueue.add(gsonRequest);
+	public <T> void postWithVolley(String url, List<BasicNameValuePair> listParams, Class<T> clazz, Response.Listener<T> listener) {
+		postContent = URLEncodedUtils.format(listParams, "utf-8");
+		postWithVolley(url, postContent, clazz, listener);
 	}
 	/**
 	 * 使用Volley通过post方式从服务器得到响应,异步执行,调用相应回调接口返回结果，响应成功结果类型为T所指定类的对象
@@ -779,29 +657,71 @@ public class VolleyUtils {
 	 * @param mapParams Map<String, String> 形式参数
 	 * @param clazz 指定类的Class对象 通过如 People.class生成 或 people.getClass() 可通过clazz.newInstance得到对应类的对象
 	 * @param listener 响应成功回调
-	 * @param errorListener 响应失败回调,如不进行错误处理，可传值Null
 	 */
-	public <T> void postWithVolley(String url, Map<String, String> mapParams, Class<T> clazz, Response.Listener<T> listener, ErrorListener errorListener) {
-		final String params = transMapToString(mapParams);
-		GsonRequest<T> gsonRequest = new GsonRequest<T>(Method.POST, url, clazz, listener, errorListener) {
-			@Override
-			public byte[] getPostBody() throws AuthFailureError {
-				return params.getBytes();
+	public <T> void postWithVolley(String url, Map<String, String> mapParams, Class<T> clazz, Response.Listener<T> listener) {
+		postContent = transMapToString(mapParams);
+		postWithVolley(url, postContent, clazz, listener);
+	}
+	/**
+	 * 使用volley上传文件
+	 * @param url 服务器地址
+	 * @param file 文件
+	 * @param listener 响应成功回调
+	 */
+	public void uploadFile(String url, File file, Response.Listener<String> listener) {
+		uploadFile(url, file, null, listener);
+	}
+	/**
+	 * 使用volley上传文件
+	 * @param url 服务器地址
+	 * @param file 文件
+	 * @param params  Map<String, String>形式参数对
+	 * @param listener 响应成功回调
+	 */
+	public void uploadFile(String url, File file, Map<String, String> params, Response.Listener<String> listener) {
+		UploadRequest uploadRequest = new UploadRequest(url, file, params, listener, new MyErrorListener());
+		uploadRequest.setTag(context);
+		mQueue.add(uploadRequest);
+	}
+	/**
+	 * 使用volley上传图片
+	 * @param url 服务器地址
+	 * @param bitmap 图片
+	 * @param listener 响应成功回调
+	 */
+	public void uploadBitmap(String url, Bitmap bitmap, Response.Listener<String> listener) {
+		uploadBitmap(url, bitmap, null, listener);
+	}
+	/**
+	 * 使用volley上传图片
+	 * @param url 服务器地址
+	 * @param bitmap 图片
+	 * @param params Map<String, String>形式参数对
+	 * @param listener 响应成功回调
+	 */
+	public void uploadBitmap(String url, Bitmap bitmap, Map<String, String> params, Response.Listener<String> listener) {
+		UploadRequest uploadRequest = new UploadRequest(url, bitmap, params, listener, new MyErrorListener());
+		uploadRequest.setTag(context);
+		mQueue.add(uploadRequest);
+	}
+	//自定义的网络异常回调
+	public class MyErrorListener implements ErrorListener {
+		@Override
+		public void onErrorResponse(VolleyError arg0) {
+			if (isShowNetworkErrorToast) {
+				Toast.makeText(context, "网络异常, 请检查网络连接", Toast.LENGTH_SHORT).show();
 			}
-		};
-		gsonRequest.setTag(context);
-		mQueue.add(gsonRequest);
+		}
 	}
-	public void cancelRequest(Context context) {
-		mQueue.cancelAll(context);
+	
+	public static boolean isShowNetworkErrorToast() {
+		return isShowNetworkErrorToast;
 	}
-	public void stopRequestQueue() {
-		mQueue.stop();
+	
+	public static void setShowNetworkErrorToast(boolean is) {
+		isShowNetworkErrorToast = is;
 	}
-	public File getCacheDir() {
-		File cacheDir = new File(context.getCacheDir(), "volley");
-		return cacheDir;
-	}
+
 	/**
 	 * 转换List<BasicNameValuePair>参数为Map<String, String>参数
 	 * @param params List<BasicNameValuePair>形式参数
@@ -856,7 +776,6 @@ public class VolleyUtils {
 		return key + "=" + value;
 	}
 	
-	
 	//自定义XMLRequest 参考： volley github StringReqeust源码
 	public static class XMLRequest extends Request<XmlPullParser> {  
 		  
@@ -890,4 +809,48 @@ public class VolleyUtils {
 	        mListener.onResponse(response);  
 	    }  
 	}  
+	//自定义GsonRequest 参考： volley github StringReqeust源码
+	public static class GsonRequest<T> extends Request<T> {
+
+		private final Listener<T> mListener;
+		private Gson mGson;
+
+		private Class<T> mClass;
+
+		public GsonRequest(int method, String url, Class<T> clazz,
+				Listener<T> listener, ErrorListener errorListener) {
+			super(method, url, errorListener);
+			mGson = new Gson();
+			mClass = clazz;
+			mListener = listener;
+		}
+		public GsonRequest(String url, Class<T> clazz, Listener<T> listener,
+				ErrorListener errorListener) {
+			this(Method.GET, url, clazz, listener, errorListener);
+		}
+		
+		/**
+		 * 通过重写getPostBody()函数， 函数返回值即为post请求的参数
+		 */
+		@Override
+		public byte[] getPostBody() throws AuthFailureError {
+			return null;
+		}
+		@Override
+		protected Response<T> parseNetworkResponse(NetworkResponse response) {
+			try {
+				String jsonString = new String(response.data,
+						HttpHeaderParser.parseCharset(response.headers));
+				return Response.success(mGson.fromJson(jsonString, mClass),
+						HttpHeaderParser.parseCacheHeaders(response));
+			} catch (UnsupportedEncodingException e) {
+				return Response.error(new ParseError(e));
+			}
+		}
+		@Override
+		protected void deliverResponse(T response) {
+			mListener.onResponse(response);
+		}
+
+	}
 }
