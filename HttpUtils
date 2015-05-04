@@ -16,7 +16,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.security.interfaces.RSAKey;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +38,6 @@ import org.apache.http.util.EntityUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import u.aly.co;
 import android.graphics.Bitmap;
 
 
@@ -49,34 +47,48 @@ import android.graphics.Bitmap;
  */
 public class HttpUtils {
 
-	private static JSONObject result;
+	private static JSONObject jsonResult;
 	private static String contentAsString = "";
 	private static String postContent = "";
-	/**
-	 * 以get方式通过HttpURLConnection从服务器获得数据,以字符串形式返回
-	 * 
-	 * @param path
-	 *            服务器地址和参数对构成字符串，如：url + "?" + params;
-	 * @return string形式的返回数据
-	 */
-	public static String getWithHttpURLConnection(String path) {
+	
+	public static String getResult(String path) {
+		HttpURLConnection conn;
 		try {
 			URL url = new URL(path);
-			HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+			conn = (HttpURLConnection) url.openConnection();
 			conn.setConnectTimeout(15000);
 			conn.setReadTimeout(10000);
 			conn.setRequestMethod("GET");
 			conn.setDoInput(true);
 			conn.connect();
 			int responseCode = conn.getResponseCode();
-			if (responseCode == 200)
+			if (responseCode == 200) 
 				contentAsString = changeInputStream(conn.getInputStream());
+			conn.disconnect();	
 		} catch (MalformedURLException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 		return contentAsString;
+	}
+	/**
+	 * 以get方式通过HttpURLConnection从服务器获得数据,以字符串形式返回
+	 * @param path 服务器地址和参数对构成字符串，如：url + "?" + params;
+	 * @return string形式的返回数据
+	 */
+	public static String getWithHttpURLConnection(String path) {
+		return getResult(path);
+	}
+	/**
+	 * 以get方式通过HttpURLConnection从服务器获得数据,以字符串形式返回
+	 * @param api 服务器地址
+	 * @param params id=1&name=2 形式参数
+	 * @return string形式的返回数据
+	 */
+	public static String getWithHttpURLConnection(String api, String params) {
+		String path = attachHttpGetParam(api, params);
+		return getResult(path);
 	}
 	/**
 	 * 以get方式通过HttpURLConnection从服务器获得数据,传递单个键值对，以字符串形式返回
@@ -87,23 +99,7 @@ public class HttpUtils {
 	 */
 	public static String getWithHttpURLConnection(String api, String key, String value) {
 		String path = attachHttpGetParam(api, key, value);
-		try {
-			URL url = new URL(path);
-			HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-			conn.setConnectTimeout(15000);
-			conn.setReadTimeout(10000);
-			conn.setRequestMethod("GET");
-			conn.setDoInput(true);
-			conn.connect();
-			int responseCode = conn.getResponseCode();
-			if (responseCode == 200)
-				contentAsString = changeInputStream(conn.getInputStream());
-		} catch (MalformedURLException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return contentAsString;
+		return getResult(path);
 	}
 	/**
 	 * 以get方式通过HttpURLConnection从服务器获得数据,以字符串形式返回
@@ -112,24 +108,8 @@ public class HttpUtils {
 	 * @return string形式的返回数据
 	 */
 	public static String getWithHttpURLConnection(String api, List<BasicNameValuePair> params) {
-		try {
-			String path = attachHttpGetParams(api, params);
-			URL url = new URL(path);
-			HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-			conn.setConnectTimeout(15000);
-			conn.setReadTimeout(10000);
-			conn.setRequestMethod("GET");
-			conn.setDoInput(true);
-			conn.connect();
-			int responseCode = conn.getResponseCode();
-			if (responseCode == 200)
-				contentAsString = changeInputStream(conn.getInputStream());
-		} catch (MalformedURLException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return contentAsString;
+		String path = attachHttpGetParams(api, params);
+		return getResult(path);
 	}
 	/**
 	 * 以get方式通过HttpURLConnection从服务器获得数据,以字符串形式返回
@@ -138,39 +118,18 @@ public class HttpUtils {
 	 * @return string形式的返回数据
 	 */
 	public static String getWithHttpURLConnection(String api, Map<String, String> params) {
-		try {
-			String path = attacHttpGetParams(api, params);
-			URL url = new URL(path);
-			HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-			conn.setConnectTimeout(15000);
-			conn.setReadTimeout(10000);
-			conn.setRequestMethod("GET");
-			conn.setDoInput(true);
-			conn.connect();
-			int responseCode = conn.getResponseCode();
-			if (responseCode == 200)
-				contentAsString = changeInputStream(conn.getInputStream());
-		} catch (MalformedURLException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return contentAsString;
+		String path = attacHttpGetParams(api, params);
+		return getResult(path);
 	}
 	
-	/**
-	 * 以get方式通过HttpClient从服务器获得数据,以字符串形式返回
-	 * 
-	 * @param path 服务器地址和参数对构成字符串，如：url + "?" + params;
-	 * @return string类型返回数据
-	 */
-	public static String getWithHttpClient(String path) {
+	public static String getHttpClientResult(String path) {
 		HttpGet getMethod = new HttpGet(path);
 		HttpClient httpClient = new DefaultHttpClient();
 		try {
 			HttpResponse response = httpClient.execute(getMethod);
 			if (response.getStatusLine().getStatusCode() == 200) {
-				return EntityUtils.toString(response.getEntity(), "utf-8");
+				contentAsString = EntityUtils.toString(response.getEntity(), "utf-8");
+				return contentAsString;
 			}
 		} catch (ClientProtocolException e) {
 			e.printStackTrace();
@@ -178,6 +137,24 @@ public class HttpUtils {
 			e.printStackTrace();
 		}
 		return contentAsString;
+	}
+	/**
+	 * 以get方式通过HttpClient从服务器获得数据,以字符串形式返回
+	 * @param path 服务器地址和参数对构成字符串，如：url + "?" + params;
+	 * @return string类型返回数据
+	 */
+	public static String getWithHttpClient(String path) {
+		return getHttpClientResult(path);
+	}
+	/**
+	 *  以get方式通过HttpClient从服务器获得数据,以字符串形式返回
+	 * @param api 服务器地址
+	 * @param params id=1&name=2 形式参数
+	 * @return string类型返回数据
+	 */
+	public static String getWithHttpClient(String api, String params) {
+		String path = attachHttpGetParam(api, params);
+		return getHttpClientResult(path);
 	}
 	/**
 	 * 以get方式通过HttpClient从服务器获得数据,以字符串形式返回
@@ -188,19 +165,7 @@ public class HttpUtils {
 	 */
 	public static String getWithHttpClient(String api, String key, String value) {
 		String path = attachHttpGetParam(api, key, value);
-		HttpGet getMethod = new HttpGet(path);
-		HttpClient httpClient = new DefaultHttpClient();
-		try {
-			HttpResponse response = httpClient.execute(getMethod);
-			if (response.getStatusLine().getStatusCode() == 200) {
-				return EntityUtils.toString(response.getEntity(), "utf-8");
-			}
-		} catch (ClientProtocolException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return contentAsString;
+		return getHttpClientResult(path);
 	}
 	/**
 	 * 以get方式通过HttpClient从服务器获得数据,以字符串形式返回
@@ -210,20 +175,7 @@ public class HttpUtils {
 	 */
 	public static String getWithHttpClient(String api, List<BasicNameValuePair> params) {
 		String path = attachHttpGetParams(api, params);
-		HttpGet getMethod = new HttpGet(path);
-		HttpClient httpClient = new DefaultHttpClient();
-		String contentAsString = "";
-		try {
-			HttpResponse response = httpClient.execute(getMethod);
-			if (response.getStatusLine().getStatusCode() == 200) {
-				return EntityUtils.toString(response.getEntity(), "utf-8");
-			}
-		} catch (ClientProtocolException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return contentAsString;
+		return getHttpClientResult(path);
 	}
 	/**
 	 * 以get方式通过HttpClient从服务器获得数据,以字符串形式返回
@@ -233,31 +185,9 @@ public class HttpUtils {
 	 */
 	public static String getWithHttpClient(String api, Map<String, String> params) {
 		String path = attacHttpGetParams(api, params);
-		HttpGet getMethod = new HttpGet(path);
-		HttpClient httpClient = new DefaultHttpClient();
-		try {
-			HttpResponse response = httpClient.execute(getMethod);
-			if (response.getStatusLine().getStatusCode() == 200) {
-				return EntityUtils.toString(response.getEntity(), "utf-8");
-			}
-		} catch (ClientProtocolException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return contentAsString;
+		return getHttpClientResult(path);
 	}
-	/**
-	 * 以post方式通过HttpURLConnection向服务器传递数据
-	 * 
-	 * @param baseUrl
-	 *            服务器地址
-	 * @param postContent
-	 *            字符串格式表示的传递参数对
-	 * @return string类型返回数据
-	 */
-	public static String postDataWithHttpURLConnection(String baseUrl,
-			String postContent) {
+	public static String postResult(String baseUrl,String postContent) {
 		try {
 			URL url = new URL(baseUrl);
 			HttpURLConnection httpConn = (HttpURLConnection) url
@@ -274,13 +204,13 @@ public class HttpUtils {
 					os));
 			writer.write(postContent);
 			writer.flush();
-
 			writer.close();
 			os.close();
 			int response = httpConn.getResponseCode();
 			if (response == HttpURLConnection.HTTP_OK) {
 				InputStream is = httpConn.getInputStream();
-				return changeInputStream(is);
+				contentAsString = changeInputStream(is);
+				return contentAsString;
 			}
 		} catch (MalformedURLException e) {
 			e.printStackTrace();
@@ -288,6 +218,16 @@ public class HttpUtils {
 			e.printStackTrace();
 		}
 		return contentAsString;
+	}
+	/**
+	 * 以post方式通过HttpURLConnection向服务器传递数据
+	 * @param baseUrl 服务器地址
+	 * @param postContent 字符串格式表示的传递参数对
+	 * @return string类型返回数据
+	 */
+	public static String postDataWithHttpURLConnection(String baseUrl,
+			String postContent) {
+		return postResult(baseUrl, postContent);
 	}
 	/**
 	 * 以post方式通过HttpURLConnection向服务器传递数据
@@ -298,36 +238,7 @@ public class HttpUtils {
 	 */
 	public static String postDataWithHttpURLConnection(String baseUrl, String key, String value) {
 		postContent = attachKeyAndVlaue(key, value);
-		try {
-			URL url = new URL(baseUrl);
-			HttpURLConnection httpConn = (HttpURLConnection) url
-					.openConnection();
-			httpConn.setConnectTimeout(15000);
-			httpConn.setReadTimeout(10000);
-			httpConn.setDoInput(true);
-			httpConn.setDoOutput(true);
-			httpConn.setRequestMethod("POST");
-			httpConn.setUseCaches(false);
-			httpConn.connect();
-			OutputStream os = httpConn.getOutputStream();
-			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-					os));
-			writer.write(postContent);
-			writer.flush();
-
-			writer.close();
-			os.close();
-			int response = httpConn.getResponseCode();
-			if (response == HttpURLConnection.HTTP_OK) {
-				InputStream is = httpConn.getInputStream();
-				return changeInputStream(is);
-			}
-		} catch (MalformedURLException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return contentAsString;
+		return postResult(baseUrl, postContent);
 	}
 	/**
 	 * 以post方式通过HttpURLConnection向服务器传递数据
@@ -338,36 +249,7 @@ public class HttpUtils {
 	public static String postDataWithHttpURLConnection(String baseUrl,
 			List<BasicNameValuePair> params) {
 		postContent = URLEncodedUtils.format(params, "utf-8");
-		try {
-			URL url = new URL(baseUrl);
-			HttpURLConnection httpConn = (HttpURLConnection) url
-					.openConnection();
-			httpConn.setConnectTimeout(15000);
-			httpConn.setReadTimeout(10000);
-			httpConn.setDoInput(true);
-			httpConn.setDoOutput(true);
-			httpConn.setRequestMethod("POST");
-			httpConn.setUseCaches(false);
-			httpConn.connect();
-			OutputStream os = httpConn.getOutputStream();
-			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-					os));
-			writer.write(postContent);
-			writer.flush();
-
-			writer.close();
-			os.close();
-			int response = httpConn.getResponseCode();
-			if (response == HttpURLConnection.HTTP_OK) {
-				InputStream is = httpConn.getInputStream();
-				return changeInputStream(is);
-			}
-		} catch (MalformedURLException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return contentAsString;
+		return postResult(baseUrl, postContent);
 	}
 	/**
 	 * 以post方式通过HttpURLConnection向服务器传递数据
@@ -377,45 +259,10 @@ public class HttpUtils {
 	 */
 	public static String postDataWithHttpURLConnection(String baseUrl, Map<String, String> params) {
 		postContent = transMapToString(params);
-		try {
-			URL url = new URL(baseUrl);
-			HttpURLConnection httpConn = (HttpURLConnection) url
-					.openConnection();
-			httpConn.setConnectTimeout(15000);
-			httpConn.setReadTimeout(10000);
-			httpConn.setDoInput(true);
-			httpConn.setDoOutput(true);
-			httpConn.setRequestMethod("POST");
-			httpConn.setUseCaches(false);
-			httpConn.connect();
-			OutputStream os = httpConn.getOutputStream();
-			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-					os));
-			writer.write(postContent);
-			writer.flush();
-			writer.close();
-			os.close();
-			int response = httpConn.getResponseCode();
-			if (response == HttpURLConnection.HTTP_OK) {
-				InputStream is = httpConn.getInputStream();
-				return changeInputStream(is);
-			}
-		} catch (MalformedURLException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return contentAsString;
+		return postResult(baseUrl, postContent);
 	}
 	
-	/**
-	 *  以post方式通过HttpClient向服务器传递数据
-	 * @param baseUrl 服务器地址
-	 * @param postContent string形式表示的参数对
-	 * @return string形式的返回数据
-	 */
-	public static String postDataWithHttpClient(String baseUrl,
-			String postContent) {
+	public static String postHttpClientResult(String baseUrl, String postContent) {
 		HttpPost postMethod = new HttpPost(baseUrl);
 		HttpClient httpClient = new DefaultHttpClient();
 		try {
@@ -438,6 +285,16 @@ public class HttpUtils {
 			e1.printStackTrace();
 		}
 		return contentAsString;
+	}
+	/**
+	 *  以post方式通过HttpClient向服务器传递数据
+	 * @param baseUrl 服务器地址
+	 * @param postContent string形式表示的参数对
+	 * @return string形式的返回数据
+	 */
+	public static String postDataWithHttpClient(String baseUrl,
+			String postContent) {
+		return postHttpClientResult(baseUrl, postContent);
 	}
 	/**
 	 * 以post方式通过HttpClient向服务器传递数据
@@ -448,28 +305,7 @@ public class HttpUtils {
 	 */
 	public static String postDataWithHttpClient(String baseUrl, String key, String value) {
 		postContent = attachKeyAndVlaue(key, value);
-		HttpPost postMethod = new HttpPost(baseUrl);
-		HttpClient httpClient = new DefaultHttpClient();
-		try {
-			StringEntity entity = new StringEntity(postContent, HTTP.UTF_8);
-			entity.setContentType("application/x-www-form-urlencoded");
-			postMethod.setEntity(entity);
-			HttpResponse response = httpClient.execute(postMethod);
-			if (response.getStatusLine().getStatusCode() == 200) {
-				try {
-					return EntityUtils.toString(response.getEntity(), "utf-8");
-				} catch (ParseException e) {
-					e.printStackTrace();
-				}
-			}
-		} catch (UnsupportedEncodingException e) {
-			e.printStackTrace();
-		} catch (ClientProtocolException e1) {
-			e1.printStackTrace();
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
-		return contentAsString;
+		return postHttpClientResult(baseUrl, postContent);
 	}
 	/**
 	 * 以post方式通过HttpClient向服务器传递数据
@@ -480,28 +316,7 @@ public class HttpUtils {
 	public static String postDataWithHttpClient(String baseUrl,
 			List<BasicNameValuePair> params) {
 		postContent = URLEncodedUtils.format(params, "utf-8");
-		HttpPost postMethod = new HttpPost(baseUrl);
-		HttpClient httpClient = new DefaultHttpClient();
-		try {
-			StringEntity entity = new StringEntity(postContent, HTTP.UTF_8);
-			entity.setContentType("application/x-www-form-urlencoded");
-			postMethod.setEntity(entity);
-			HttpResponse response = httpClient.execute(postMethod);
-			if (response.getStatusLine().getStatusCode() == 200) {
-				try {
-					return EntityUtils.toString(response.getEntity(), "utf-8");
-				} catch (ParseException e) {
-					e.printStackTrace();
-				}
-			}
-		} catch (UnsupportedEncodingException e) {
-			e.printStackTrace();
-		} catch (ClientProtocolException e1) {
-			e1.printStackTrace();
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
-		return contentAsString;
+		return postHttpClientResult(baseUrl, postContent);
 	}
 	/**
 	 * 以post方式通过HttpClient向服务器传递数据
@@ -512,28 +327,7 @@ public class HttpUtils {
 	public static String postDataWithHttpClient(String baseUrl,
 			Map<String, String> params) {
 		postContent = transMapToString(params);
-		HttpPost postMethod = new HttpPost(baseUrl);
-		HttpClient httpClient = new DefaultHttpClient();
-		try {
-			StringEntity entity = new StringEntity(postContent, HTTP.UTF_8);
-			entity.setContentType("application/x-www-form-urlencoded");
-			postMethod.setEntity(entity);
-			HttpResponse response = httpClient.execute(postMethod);
-			if (response.getStatusLine().getStatusCode() == 200) {
-				try {
-					return EntityUtils.toString(response.getEntity(), "utf-8");
-				} catch (ParseException e) {
-					e.printStackTrace();
-				}
-			}
-		} catch (UnsupportedEncodingException e) {
-			e.printStackTrace();
-		} catch (ClientProtocolException e1) {
-			e1.printStackTrace();
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
-		return contentAsString;
+		return postHttpClientResult(baseUrl, postContent);
 	}
 	/**
 	 * 以get方式通过HttpURLConnection从服务器获得JSON格式数据
@@ -542,12 +336,27 @@ public class HttpUtils {
 	 */
 	public static JSONObject getJsonWithHttpURLConnection(String path) {
 		try {
-			result = new JSONObject(getWithHttpURLConnection(path));
-			return result;
+			jsonResult = new JSONObject(getWithHttpURLConnection(path));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
+	}
+	/**
+	 * 以get方式通过HttpURLConnection从服务器获得JSON格式数据
+	 * @param api 服务器api地址 
+	 * @param params id=1&name=2参数对
+	 * @return JSONObject格式数据
+	 */
+	public static JSONObject getJsonWithHttpURLConnection(String api, String params) {
+		try {
+			jsonResult = new JSONObject(getWithHttpURLConnection(api, params));
+			return jsonResult;
+		} catch (JSONException e) {
+			e.printStackTrace();
+		}
+		return jsonResult;
 	}
 	/**
 	 * 以get方式通过HttpURLConnection从服务器获得JSON格式数据
@@ -558,12 +367,12 @@ public class HttpUtils {
 	 */
 	public static JSONObject getJsonWithHttpURLConnection(String api, String key, String value) {
 		try {
-			result = new JSONObject(getWithHttpURLConnection(api, key, value));
-			return result;
+			jsonResult = new JSONObject(getWithHttpURLConnection(api, key, value));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	/**
 	 * 以get方式通过HttpURLConnection从服务器获得JSON格式数据
@@ -573,12 +382,12 @@ public class HttpUtils {
 	 */
 	public static JSONObject getJsonWithHttpURLConnection(String api, List<BasicNameValuePair> params) {
 		try {
-			result = new JSONObject(getWithHttpURLConnection(api, params));
-			return result;
+			jsonResult = new JSONObject(getWithHttpURLConnection(api, params));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	/**
 	 * 以get方式通过HttpURLConnection从服务器获得JSON格式数据
@@ -588,12 +397,12 @@ public class HttpUtils {
 	 */
 	public static JSONObject getJsonWithHttpURLConnection(String api, Map<String, String> params) {
 		try {
-			result = new JSONObject(getWithHttpURLConnection(api, params));
-			return result;
+			jsonResult = new JSONObject(getWithHttpURLConnection(api, params));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	
 	/**
@@ -603,12 +412,27 @@ public class HttpUtils {
 	 */
 	public static JSONObject getJsonWithHttpClient(String path) {
 		try {
-			result = new JSONObject(getWithHttpClient(path));
-			return result;
+			jsonResult = new JSONObject(getWithHttpClient(path));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
+	}
+	/**
+	 * 以get方式通过HttpClient从服务器获得JSON格式数据
+	 * @param api 服务器api地址 
+	 * @param params id=1&name=nick类型参数对
+	 * @return JSONObject格式数据
+	 */
+	public static JSONObject getJsonWithHttpClient(String api, String params) {
+		try {
+			jsonResult = new JSONObject(getWithHttpClient(api, params));
+			return jsonResult;
+		} catch (JSONException e) {
+			e.printStackTrace();
+		}
+		return jsonResult;
 	}
 	/**
 	 * 以get方式通过HttpClient从服务器获得JSON格式数据
@@ -619,12 +443,12 @@ public class HttpUtils {
 	 */
 	public static JSONObject getJsonWithHttpClient(String api, String key, String value) {
 		try {
-			result = new JSONObject(getWithHttpClient(api, key, value));
-			return result;
+			jsonResult = new JSONObject(getWithHttpClient(api, key, value));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	/**
 	 *  以get方式通过HttpClient从服务器获得JSON格式数据
@@ -634,12 +458,12 @@ public class HttpUtils {
 	 */
 	public static JSONObject getJsonWithHttpClient(String api, List<BasicNameValuePair> params) {
 		try {
-			result = new JSONObject(getWithHttpClient(api, params));
-			return result;
+			jsonResult = new JSONObject(getWithHttpClient(api, params));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	/**
 	 * 以get方式通过HttpClient从服务器获得JSON格式数据
@@ -649,12 +473,12 @@ public class HttpUtils {
 	 */
 	public static JSONObject getJsonWithHttpClient(String api, Map<String, String> params) {
 		try {
-			result = new JSONObject(getWithHttpClient(api, params));
-			return result;
+			jsonResult = new JSONObject(getWithHttpClient(api, params));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	/**
 	 * 以post形式通过HttpURLConnection向服务器传递数据,返回json格式数据
@@ -664,12 +488,12 @@ public class HttpUtils {
 	 */
 	public static JSONObject jsonPostWithHttpURLConnection(String baseUrl, String postContent) {
 		try {
-			result = new JSONObject(postDataWithHttpURLConnection(baseUrl, postContent));
-			return result;
+			jsonResult = new JSONObject(postDataWithHttpURLConnection(baseUrl, postContent));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	/**
 	 * 以post形式通过HttpURLConnection向服务器传递数据,返回json格式数据
@@ -680,12 +504,12 @@ public class HttpUtils {
 	 */
 	public static JSONObject  jsonPostWithHttpURLConnection(String baseUrl, String key, String value) {
 		try {
-			result = new JSONObject(postDataWithHttpURLConnection(baseUrl, key, value));
-			return result;
+			jsonResult = new JSONObject(postDataWithHttpURLConnection(baseUrl, key, value));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	/**
 	 * 以post形式通过HttpURLConnection向服务器传递数据,返回json格式数据
@@ -695,12 +519,12 @@ public class HttpUtils {
 	 */
 	public static JSONObject jsonPostWithHttpURLConnection(String baseUrl, List<BasicNameValuePair> params) {
 		try {
-			result = new JSONObject(postDataWithHttpURLConnection(baseUrl, params));
-			return result;
+			jsonResult = new JSONObject(postDataWithHttpURLConnection(baseUrl, params));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	/**
 	 * 以post形式通过HttpURLConnection向服务器传递数据,返回json格式数据
@@ -710,12 +534,12 @@ public class HttpUtils {
 	 */
 	public static JSONObject jsonPostWithHttpURLConnection(String baseUrl, Map<String, String> params) {
 		try {
-			result = new JSONObject(postDataWithHttpURLConnection(baseUrl, params));
-			return result;
+			jsonResult = new JSONObject(postDataWithHttpURLConnection(baseUrl, params));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	
 	/**
@@ -726,12 +550,12 @@ public class HttpUtils {
 	 */
 	public static JSONObject jsonPostWithHttpClient(String baseUrl, String postContent) {
 		try {
-			result = new JSONObject(postDataWithHttpClient(baseUrl, postContent));
-			return result;
+			jsonResult = new JSONObject(postDataWithHttpClient(baseUrl, postContent));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	/**
 	 * 以post形式通过HttpClientn向服务器传递数据,返回json格式数据
@@ -742,12 +566,12 @@ public class HttpUtils {
 	 */
 	public static JSONObject jsonPostWithHttpClient(String baseUrl, String key, String value) {
 		try {
-			result = new JSONObject(postDataWithHttpClient(baseUrl, key, value));
-			return result;
+			jsonResult = new JSONObject(postDataWithHttpClient(baseUrl, key, value));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	/**
 	 * 以post形式通过HttpClient向服务器传递数据,返回json格式数据
@@ -757,12 +581,12 @@ public class HttpUtils {
 	 */
 	public static JSONObject jsonPostWithHttpClient(String baseUrl, List<BasicNameValuePair> params) {
 		try {
-			result = new JSONObject(postDataWithHttpClient(baseUrl, params));
-			return result;
+			jsonResult = new JSONObject(postDataWithHttpClient(baseUrl, params));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	/**
 	 * 以post形式通过HttpClient向服务器传递数据,返回json格式数据
@@ -772,12 +596,12 @@ public class HttpUtils {
 	 */
 	public static JSONObject jsonPostWithHttpClient(String baseUrl, Map<String, String> params) {
 		try {
-			result = new JSONObject(postDataWithHttpClient(baseUrl, params));
-			return result;
+			jsonResult = new JSONObject(postDataWithHttpClient(baseUrl, params));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	
 	/**
@@ -848,11 +672,11 @@ public class HttpUtils {
 	 */
 	public static JSONObject jsonUploadFileWithHttpURLConnection(String baseUrl, File file) {
 		try {
-			result = new JSONObject(uploadFileWithHttpURLConnection(baseUrl, file));
+			jsonResult = new JSONObject(uploadFileWithHttpURLConnection(baseUrl, file));
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	/**
 	 * 通过HttpURLConnection向服务器上传文件， 并附带参数
@@ -934,11 +758,11 @@ public class HttpUtils {
 	public static JSONObject jsonUploadFileWithHttURLCoonection(String baseUrl,
 			File file, String key, String value)  {
 		try {
-			result = new JSONObject(uploadFileWithHttURLCoonection(baseUrl, file, key, value));
+			jsonResult = new JSONObject(uploadFileWithHttURLCoonection(baseUrl, file, key, value));
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	private static final int TIME_OUT = 10 * 1000; // 超时时间
 	/**
@@ -1086,12 +910,12 @@ public class HttpUtils {
 	public static JSONObject jsonUploadBitmapWithHttpURLConnection(String baseUrl,
 			Bitmap bitmap, String key, String value) {
 		try {
-			result = new JSONObject(uploadBitmapWithHttpURLConnection(baseUrl, bitmap, key, value));
-			return result;
+			jsonResult = new JSONObject(uploadBitmapWithHttpURLConnection(baseUrl, bitmap, key, value));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}
 	/**
 	 * 通过HttpURLConnection向服务器上传图片,返回json格式数据
@@ -1102,17 +926,17 @@ public class HttpUtils {
 	public static JSONObject jsonUploadBitmapWithHttpURLConnection(String baseUrl,
 			Bitmap bitmap) {
 		try {
-			result = new JSONObject(uploadBitmapWithHttpURLConnection(baseUrl, bitmap));
-			return result;
+			jsonResult = new JSONObject(uploadBitmapWithHttpURLConnection(baseUrl, bitmap));
+			return jsonResult;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		return result;
+		return jsonResult;
 	}	
 	/**
 	 * 通过HttpClient向服务器上传文件 TODO, 实现方法需要引入httpmime包，构造MultipartyEntity对象通过相应setEntity实现
-	 * 具体细节stackoverflow 或 google . httpclient upload / httpclient multiparty  待实现
-	 * 不建议使用此种方式
+	 * 具体细节stackoverflow 或 google . httpclient upload / httpclient multiparty 
+	 * 不建议使用此种方式,会增大程序包
 	 * @param baseUrl 服务器地址
 	 * @param file 文件对象
 	 * @return 返回数据
@@ -1155,7 +979,6 @@ public class HttpUtils {
 		}
 		return sb.toString();
 	}
-	
 	/**
 	 * 转换inputstream为string
 	 * @param inputStream
