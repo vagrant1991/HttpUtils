@@ -59,7 +59,9 @@ import com.squareup.okhttp.OkUrlFactory;
 /**
  * Volley工具类,使用Volley访问网络，封装了各种常用功能，具体查看方法注释 需添加网络连接权限：<uses-permission
  * android:name="android.permission.INTERNET" />
- * 使用GsonRequest需要引入Gson包，可替换为fastjson, 替换volley底层网络层需要引入okhttp,okhttp-urlconnection, 可maven,google最新版本
+ * 使用GsonRequest需要引入Gson包，可替换为fastjson,
+ * 替换volley底层网络层需要引入okhttp,okhttp-urlconnection, 可maven,google最新版本
+ * 
  * @author vagrant QQ:513302092
  * @date 创建时间: 2015年4月4日
  */
@@ -105,10 +107,13 @@ public class VolleyManager {
 
 	public RequestQueue getRequestQueue() {
 		if (mQueue == null) {
-			//使用默认配置,参见volley源码： https://github.com/mcxiaoke/android-volley/blob/master/src/main/java/com/android/volley/toolbox/Volley.java
+			// 使用默认配置,参见volley源码：
+			// https://github.com/mcxiaoke/android-volley/blob/master/src/main/java/com/android/volley/toolbox/Volley.java
 			mQueue = Volley.newRequestQueue(context.getApplicationContext());
-			// 使用OKHttp作为volley网络传输层, android 4.4 HttpUrlConnection底层采用了Okhttp实现，okhttp具有更好的特性
-			//mQueue = Volley.newRequestQueue(context.getApplicationContext(), new OkHttpStack());
+			// 使用OKHttp作为volley网络传输层, android 4.4
+			// HttpUrlConnection底层采用了Okhttp实现，okhttp具有更好的特性
+			// mQueue = Volley.newRequestQueue(context.getApplicationContext(),
+			// new OkHttpStack());
 		}
 		return mQueue;
 	}
@@ -131,11 +136,13 @@ public class VolleyManager {
 	public void stopRequestQueue() {
 		mQueue.stop();
 	}
-	//设置超时 timeout = 10000 + 10000 * 2 see:http://stackoverflow.com/questions/17094718/android-volley-timeout
+
+	// 设置超时 timeout = 10000 + 10000 * 2
+	// see:http://stackoverflow.com/questions/17094718/android-volley-timeout
 	public RetryPolicy getRetryPolicy() {
 		return new DefaultRetryPolicy(10000, 2, 2f);
 	}
-	
+
 	public File getCacheDir() {
 		File cacheDir = new File(context.getCacheDir(), "volley");
 		return cacheDir;
@@ -303,8 +310,7 @@ public class VolleyManager {
 	 * @param listener
 	 *            响应成功回调
 	 */
-	public void postWithVolley(String api,
-			List<BasicNameValuePair> params,
+	public void postWithVolley(String api, List<BasicNameValuePair> params,
 			Response.Listener<String> listener) {
 		Map<String, String> map = convertListUrlToMap(params);
 		postWithVolley(api, map, listener);
@@ -581,7 +587,7 @@ public class VolleyManager {
 			}
 		};
 		jsonArrayRequest.setTag(context);
-		jsonArrayRequest.setRetryPolicy(getRetryPolicy());		
+		jsonArrayRequest.setRetryPolicy(getRetryPolicy());
 		mQueue.add(jsonArrayRequest);
 	}
 
@@ -650,8 +656,8 @@ public class VolleyManager {
 	 */
 	public void getBitmapWithVolley(String url,
 			Response.Listener<Bitmap> listener) {
-		imageRequest = new ImageRequest(url, listener, 0, 0, ScaleType.CENTER_INSIDE, Config.RGB_565,
-				new MyErrorListener());
+		imageRequest = new ImageRequest(url, listener, 0, 0,
+				ScaleType.CENTER_INSIDE, Config.RGB_565, new MyErrorListener());
 		imageRequest.setTag(context);
 		imageRequest.setRetryPolicy(getRetryPolicy());
 		mQueue.add(imageRequest);
@@ -704,7 +710,7 @@ public class VolleyManager {
 		imageLoader.get(url, new ImageListener() {
 			@Override
 			public void onErrorResponse(VolleyError arg0) {
-			
+
 			}
 
 			@Override
@@ -731,8 +737,9 @@ public class VolleyManager {
 		imageLoader.get(url, new ImageListener() {
 			@Override
 			public void onErrorResponse(VolleyError arg0) {
-			
+
 			}
+
 			@Override
 			public void onResponse(ImageContainer arg0, boolean arg1) {
 				imageView.setImageBitmap(arg0.getBitmap());
@@ -805,6 +812,7 @@ public class VolleyManager {
 
 	/**
 	 * 使用NetWorkImageView加载图片，NetWorkImageView需在layout文件中定义
+	 * 
 	 * @param url
 	 *            图片地址
 	 * @param networkImageView
@@ -1097,7 +1105,7 @@ public class VolleyManager {
 	}
 
 	// 自定义的网络异常回调
-	public class MyErrorListener implements ErrorListener {
+	private class MyErrorListener implements ErrorListener {
 		@Override
 		public void onErrorResponse(VolleyError arg0) {
 			if (isShowNetworkErrorToast) {
@@ -1122,7 +1130,7 @@ public class VolleyManager {
 	 *            List<BasicNameValuePair>形式参数
 	 * @return Map<String, String>参数
 	 */
-	public Map<String, String> convertListUrlToMap(
+	private Map<String, String> convertListUrlToMap(
 			List<BasicNameValuePair> params) {
 		String param = URLEncodedUtils.format(params, "utf-8");
 		Map<String, String> map = new LinkedHashMap<String, String>();
@@ -1141,7 +1149,7 @@ public class VolleyManager {
 	 *            <String, String> 参数
 	 * @return 转换后的String数据
 	 */
-	public String transMapToString(Map<String, String> map) {
+	private String transMapToString(Map<String, String> map) {
 		Entry<String, String> entry;
 		StringBuilder sb = new StringBuilder();
 		for (Iterator<Entry<String, String>> iterator = map.entrySet()
@@ -1157,28 +1165,28 @@ public class VolleyManager {
 
 	private final String CHARSET_NAME = "UTF-8";
 
-	public String formatParams(List<BasicNameValuePair> params) {
+	private String formatParams(List<BasicNameValuePair> params) {
 		return URLEncodedUtils.format(params, CHARSET_NAME);
 	}
 
-	public String attacHttpGetParams(String url, Map<String, String> params) {
+	private String attacHttpGetParams(String url, Map<String, String> params) {
 		return attachHttpGetParam(url, transMapToString(params));
 	}
 
-	public String attachHttpGetParams(String url,
+	private String attachHttpGetParams(String url,
 			List<BasicNameValuePair> params) {
 		return url + "?" + formatParams(params);
 	}
 
-	public String attachHttpGetParam(String url, String params) {
+	private String attachHttpGetParam(String url, String params) {
 		return url + "?" + params;
 	}
 
-	public String attachHttpGetParam(String url, String name, String value) {
+	private String attachHttpGetParam(String url, String name, String value) {
 		return url + "?" + name + "=" + value;
 	}
 
-	public String attachKeyAndVlaue(String key, String value) {
+	private String attachKeyAndVlaue(String key, String value) {
 		return key + "=" + value;
 	}
 
@@ -1273,7 +1281,7 @@ public class VolleyManager {
 
 	// 自定义使用Okhttp作为volley传输层 ,需要引入okhttp, okhttp-urlconnection包
 	// see:http://stackoverflow.com/questions/24375043/how-to-implement-android-volley-with-okhttp-2-0
-	public static class OkHttpStack extends HurlStack {
+	private static class OkHttpStack extends HurlStack {
 		private final OkUrlFactory okUrlFactory;
 
 		public OkHttpStack() {
@@ -1286,6 +1294,7 @@ public class VolleyManager {
 			}
 			this.okUrlFactory = okUrlFactory;
 		}
+
 		@Override
 		protected HttpURLConnection createConnection(URL url)
 				throws IOException {
